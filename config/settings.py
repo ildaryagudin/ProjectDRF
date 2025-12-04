@@ -59,11 +59,11 @@ TEMPLATES = [
         'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
-            'contextProcessors': [
-                'django.template.contextProcessors.debug',
-                'django.template.contextProcessors.request',
-                'django.contrib.auth.contextProcessors.auth',
-                'django.contrib.messages.contextProcessors.messages',
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
             ],
         },
     },
