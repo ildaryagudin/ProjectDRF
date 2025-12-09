@@ -17,10 +17,8 @@ class LessonSerializer(serializers.ModelSerializer):
 class CourseSerializer(serializers.ModelSerializer):
     """Serializer for Course model."""
 
-    lessons_count = serializers.IntegerField(
-        source='lessons.count',
-        read_only=True
-    )
+    # Используем SerializerMethodField для количества уроков
+    lessons_count = serializers.SerializerMethodField()
     lessons = LessonSerializer(many=True, read_only=True)
 
     class Meta:
@@ -31,14 +29,16 @@ class CourseSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'lessons_count']
 
+    def get_lessons_count(self, obj):
+        """Get count of lessons for the course."""
+        return obj.lessons.count()
+
 
 class CourseListSerializer(serializers.ModelSerializer):
     """Serializer for Course list (without detailed lessons)."""
 
-    lessons_count = serializers.IntegerField(
-        source='lessons.count',
-        read_only=True
-    )
+    # Используем SerializerMethodField для количества уроков
+    lessons_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -47,3 +47,7 @@ class CourseListSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'lessons_count'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'lessons_count']
+
+    def get_lessons_count(self, obj):
+        """Get count of lessons for the course."""
+        return obj.lessons.count()
