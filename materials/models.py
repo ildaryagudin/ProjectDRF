@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.conf import settings
 
 
 class Course(models.Model):
@@ -22,6 +23,14 @@ class Course(models.Model):
         blank=True,
         null=True,
         help_text=_('Course description')
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='courses',
+        verbose_name=_('owner')
     )
     created_at = models.DateTimeField(
         _('created at'),
@@ -73,6 +82,14 @@ class Lesson(models.Model):
         related_name='lessons',
         verbose_name=_('course'),
         help_text=_('Related course')
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lessons',
+        verbose_name=_('owner')
     )
     created_at = models.DateTimeField(
         _('created at'),

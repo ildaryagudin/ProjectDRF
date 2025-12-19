@@ -9,9 +9,9 @@ class LessonSerializer(serializers.ModelSerializer):
         model = Lesson
         fields = [
             'id', 'title', 'description', 'preview',
-            'video_url', 'course', 'created_at', 'updated_at'
+            'video_url', 'course', 'owner', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
 
 
 class CourseSerializer(serializers.ModelSerializer):
@@ -24,10 +24,10 @@ class CourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
         fields = [
-            'id', 'title', 'preview', 'description',
+            'id', 'title', 'preview', 'description', 'owner',
             'created_at', 'updated_at', 'lessons_count', 'lessons'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'lessons_count']
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at', 'lessons_count']
 
     def get_lessons_count(self, obj):
         """Get count of lessons for the course."""
@@ -43,10 +43,10 @@ class CourseListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
         fields = [
-            'id', 'title', 'preview', 'description',
+            'id', 'title', 'preview', 'description', 'owner',
             'created_at', 'updated_at', 'lessons_count'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'lessons_count']
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at', 'lessons_count']
 
     def get_lessons_count(self, obj):
         """Get count of lessons for the course."""
