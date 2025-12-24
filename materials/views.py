@@ -1,8 +1,128 @@
-from rest_framework import viewsets, generics, permissions, filters
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import Course, Lesson
-from .serializers import CourseSerializer, CourseListSerializer, LessonSerializer
-from users.permissions import IsOwnerOrModerator, IsModerator, IsNotModerator
+from rest_framework import status
+from .models import Course, Subscription
+from .serializers import SubscriptionSerializer
+from .paginators import CoursePagination, LessonPagination
+
+
+class SubscriptionAPIView(APIView):
+    """
+    API endpoint for managing course subscriptions.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Toggle subscription for a course.
+        """
+        user = request.user
+        course_id = request.data.get('course_id')
+
+        if not course_id:
+            return Response(
+                {"error": "course_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response(
+                {"error": "Course not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if subscription exists
+        subscription = Subscription.objects.filter(
+            user=user,
+            course=course
+        ).first()
+
+        if subscription:
+            # Toggle subscription status
+            subscription.is_active = not subscription.is_active
+            subscription.save()
+
+            if subscription.is_active:
+                message = 'Subscription activated'
+            else:
+                message = 'Subscription deactivated'
+        else:
+            # Create new subscription
+            subscription = Subscription.objects.create(
+                user=user,
+                course=course
+            )
+            message = 'Subscription created'
+
+        serializer = SubscriptionSerializer(subscription)
+        return Response(
+            {
+                "message": message,
+                "subscription": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
+    def delete(self, request, *args, **kwargs):
+        """
+        Remove subscription for a course.
+        """
+        user = request.user
+        course_id = request.data.get('course_id')
+
+        if not course_id:
+            return Response(
+                {"error": "course_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        subscription = get_object_or_404(
+            Subscription,
+            user=user,
+            course_id=course_id
+        )
+
+        subscription.delete()
+
+        return Response(
+            {"message": "Subscription removed"},
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+    def get(self, request, *args, **kwargs):
+        """
+        Get user's subscriptions.
+        """
+        user = request.user
+        subscriptions = Subscription.objects.filter(user=user, is_active=True)
+
+        serializer = SubscriptionSerializer(subscriptions, many=True)
+        return Response(serializer.data)
+
+
+class CourseSubscriptionStatusAPIView(APIView):
+    """
+    API endpoint for checking subscription status for a course.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, course_id, *args, **kwargs):
+        """
+        Check if user is subscribed to a course.
+        """
+        user = request.user
+
+        is_subscribed = Subscription.objects.filter(
+            user=user,
+            course_id=course_id,
+            is_active=True
+        ).exists()
+
+        return Response({"is_subscribed": is_subscribed})
 
 
 class CourseViewSet(viewsets.ModelViewSet):
@@ -10,119 +130,61 @@ class CourseViewSet(viewsets.ModelViewSet):
     ViewSet for Course model with CRUD operations.
     """
     queryset = Course.objects.all()
-
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return CourseListSerializer
-        return CourseSerializer
-
-    def get_permissions(self):
-        """
-        Instantiates and returns the list of permissions that this view requires.
-        """
-        if self.action == 'list':
-            # Anyone can view course list
-            permission_classes = [permissions.IsAuthenticated]
-        elif self.action == 'retrieve':
-            # Anyone can view course details
-            permission_classes = [permissions.IsAuthenticated]
-        elif self.action == 'create':
-            # Only non-moderators can create courses
-            permission_classes = [permissions.IsAuthenticated, IsNotModerator]
-        elif self.action in ['update', 'partial_update']:
-            # Only owner or moderator can update
-            permission_classes = [permissions.IsAuthenticated, IsOwnerOrModerator]
-        elif self.action == 'destroy':
-            # Only owner can delete (moderators cannot delete)
-            permission_classes = [permissions.IsAuthenticated, ~IsModerator, IsOwnerOrModerator]
-        else:
-            permission_classes = [permissions.IsAuthenticated]
-
-        return [permission() for permission in permission_classes]
-
-    def perform_create(self, serializer):
-        """Automatically set the owner to the current user when creating a course."""
-        serializer.save(owner=self.request.user)
-
-    def get_queryset(self):
-        """Filter queryset based on user permissions."""
-        user = self.request.user
-
-        # If user is moderator, show all courses
-        if user.groups.filter(name='moderators').exists():
-            return Course.objects.all()
-
-        # Otherwise, show only user's own courses
-        return Course.objects.filter(owner=user)
-
+    pagination_class = CoursePagination  # Добавляем пагинацию
 
 class LessonListCreateAPIView(generics.ListCreateAPIView):
     """
     Generic view for listing and creating lessons.
     """
     serializer_class = LessonSerializer
+    pagination_class = LessonPagination  # Добавляем пагинацию
 
-    def get_permissions(self):
-        """
-        Instantiates and returns the list of permissions that this view requires.
-        """
-        if self.request.method == 'GET':
-            permission_classes = [permissions.IsAuthenticated]
-        elif self.request.method == 'POST':
-            # Only non-moderators can create lessons
-            permission_classes = [permissions.IsAuthenticated, IsNotModerator]
-        else:
-            permission_classes = [permissions.IsAuthenticated]
-
-        return [permission() for permission in permission_classes]
-
-    def get_queryset(self):
-        """Filter queryset based on user permissions."""
-        user = self.request.user
-
-        # If user is moderator, show all lessons
-        if user.groups.filter(name='moderators').exists():
-            return Lesson.objects.all()
-
-        # Otherwise, show only user's own lessons
-        return Lesson.objects.filter(owner=user)
-
-    def perform_create(self, serializer):
-        """Automatically set the owner to the current user when creating a lesson."""
-        serializer.save(owner=self.request.user)
-
-
-class LessonRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+class SubscriptionAPIView(APIView):
     """
-    Generic view for retrieving, updating and deleting a lesson.
+    API endpoint for managing course subscriptions.
     """
-    queryset = Lesson.objects.all()
-    serializer_class = LessonSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination  # Для GET запросов
 
-    def get_permissions(self):
+    def get(self, request, *args, **kwargs):
         """
-        Instantiates and returns the list of permissions that this view requires.
+        Get user's subscriptions with pagination.
         """
-        if self.request.method == 'GET':
-            permission_classes = [permissions.IsAuthenticated]
-        elif self.request.method in ['PUT', 'PATCH']:
-            # Only owner or moderator can update
-            permission_classes = [permissions.IsAuthenticated, IsOwnerOrModerator]
-        elif self.request.method == 'DELETE':
-            # Only owner can delete (moderators cannot delete)
-            permission_classes = [permissions.IsAuthenticated, ~IsModerator, IsOwnerOrModerator]
-        else:
-            permission_classes = [permissions.IsAuthenticated]
+        user = request.user
+        subscriptions = Subscription.objects.filter(user=user, is_active=True)
 
-        return [permission() for permission in permission_classes]
+        # Apply pagination
+        page = self.paginate_queryset(subscriptions)
+        if page is not None:
+            serializer = SubscriptionSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
-    def get_queryset(self):
-        """Filter queryset based on user permissions."""
-        user = self.request.user
+        serializer = SubscriptionSerializer(subscriptions, many=True)
+        return Response(serializer.data)
 
-        # If user is moderator, show all lessons
-        if user.groups.filter(name='moderators').exists():
-            return Lesson.objects.all()
+    @property
+    def paginator(self):
+        """
+        The paginator instance associated with the view, or `None`.
+        """
+        if not hasattr(self, '_paginator'):
+            if self.pagination_class is None:
+                self._paginator = None
+            else:
+                self._paginator = self.pagination_class()
+        return self._paginator
 
-        # Otherwise, show only user's own lessons
-        return Lesson.objects.filter(owner=user)
+    def paginate_queryset(self, queryset):
+        """
+        Return a single page of results, or `None` if pagination is disabled.
+        """
+        if self.paginator is None:
+            return None
+        return self.paginator.paginate_queryset(queryset, self.request, view=self)
+
+    def get_paginated_response(self, data):
+        """
+        Return a paginated style `Response` object for the given output data.
+        """
+        assert self.paginator is not None
+        return self.paginator.get_paginated_response(data)
