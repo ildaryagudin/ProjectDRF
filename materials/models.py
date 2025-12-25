@@ -159,7 +159,6 @@ class Lesson(models.Model):
                 raise ValidationError({'description': e.message})
 
 
-
 class Subscription(models.Model):
     """Subscription model for course updates."""
 
@@ -167,31 +166,29 @@ class Subscription(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='subscriptions',
-        verbose_name=_('user')
+        verbose_name=_('user'),
+        help_text=_('Subscribed user')
     )
     course = models.ForeignKey(
         Course,
         on_delete=models.CASCADE,
         related_name='subscriptions',
-        verbose_name=_('course')
+        verbose_name=_('course'),
+        help_text=_('Subscribed course')
     )
-    subscribed_at = models.DateTimeField(
-        _('subscribed at'),
+    created_at = models.DateTimeField(
+        _('created at'),
         auto_now_add=True
-    )
-    is_active = models.BooleanField(
-        _('is active'),
-        default=True
     )
 
     class Meta:
         verbose_name = _('subscription')
         verbose_name_plural = _('subscriptions')
-        unique_together = ['user', 'course']
-        ordering = ['-subscribed_at']
+        unique_together = ['user', 'course']  # Один пользователь может подписаться на курс только один раз
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.user.email} -> {self.course.title}"
+        return f"{self.user.email} - {self.course.title}"
 
     def save(self, *args, **kwargs):
         """Override save to ensure unique subscription."""

@@ -81,3 +81,12 @@ class LessonPagination(StandardResultsSetPagination):
     page_size = 15  # Good for list views
     page_size_query_param = 'page_size'
     max_page_size = 60
+
+
+class MaterialsPagination(PageNumberPagination):
+    """
+    Пагинатор для курсов и уроков.
+    """
+    page_size = 10  # Количество элементов на странице по умолчанию
+    page_size_query_param = 'page_size'  # Параметр для изменения размера страницы
+    max_page_size = 50  # Максимальное количество элементов на странице
