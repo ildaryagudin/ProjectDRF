@@ -111,10 +111,18 @@ class NoExternalLinksValidator:
 # Function-based validators
 def validate_youtube_url(value):
     """
-    Function-based validator for YouTube URLs.
+    Валидатор для проверки, что ссылка ведет на youtube.com
     """
-    validator = YouTubeURLValidator()
-    return validator(value)
+    parsed_url = urlparse(value)
+    domain = parsed_url.netloc.lower()
+
+    # Разрешаем youtube.com и его поддомены (www.youtube.com, m.youtube.com и т.д.)
+    if not (domain == 'youtube.com' or domain == 'www.youtube.com' or
+            domain.endswith('.youtube.com')):
+        raise serializers.ValidationError(
+            "Разрешены только ссылки на youtube.com"
+        )
+    return value
 
 
 def validate_no_external_links(text):

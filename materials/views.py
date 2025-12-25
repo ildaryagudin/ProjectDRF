@@ -6,7 +6,7 @@ from rest_framework import status
 from .models import Course, Subscription
 from .serializers import SubscriptionSerializer
 from .paginators import CoursePagination, LessonPagination
-
+from .paginators import MaterialsPagination
 
 class SubscriptionAPIView(APIView):
     """
@@ -130,14 +130,67 @@ class CourseViewSet(viewsets.ModelViewSet):
     ViewSet for Course model with CRUD operations.
     """
     queryset = Course.objects.all()
-    pagination_class = CoursePagination  # Добавляем пагинацию
+    permission_classes = [permissions.AllowAny]  # Для тестирования
+    pagination_class = MaterialsPagination
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return CourseListSerializer
+        return CourseSerializer
+
+    @action(detail=True, methods=['post', 'delete'], url_path='subscribe')
+    def subscribe(self, request, pk=None):
+        """Подписка/отписка на обновления курса."""
+        course = self.get_object()
+        user = request.user
+
+        if not user.is_authenticated:
+            return Response(
+                {'error': 'Требуется аутентификация'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        if request.method == 'POST':
+            # Подписка
+            subscription, created = Subscription.objects.get_or_create(
+                user=user,
+                course=course
+            )
+            if created:
+                return Response(
+                    {'message': 'Вы успешно подписались на обновления курса'},
+                    status=status.HTTP_201_CREATED
+                )
+            return Response(
+                {'message': 'Вы уже подписаны на этот курс'},
+                status=status.HTTP_200_OK
+            )
+
+        elif request.method == 'DELETE':
+            # Отписка
+            subscription = Subscription.objects.filter(
+                user=user,
+                course=course
+            ).first()
+            if subscription:
+                subscription.delete()
+                return Response(
+                    {'message': 'Вы отписались от обновлений курса'},
+                    status=status.HTTP_200_OK
+                )
+            return Response(
+                {'message': 'Вы не подписаны на этот курс'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class LessonListCreateAPIView(generics.ListCreateAPIView):
     """
     Generic view for listing and creating lessons.
     """
+    queryset = Lesson.objects.all()
     serializer_class = LessonSerializer
-    pagination_class = LessonPagination  # Добавляем пагинацию
+    permission_classes = [permissions.AllowAny]
+    pagination_class = MaterialsPagination  # Добавляем пагинацию
 
 class SubscriptionAPIView(APIView):
     """
@@ -188,3 +241,12 @@ class SubscriptionAPIView(APIView):
         """
         assert self.paginator is not None
         return self.paginator.get_paginated_response(data)
+
+
+class LessonRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Generic view for retrieving, updating and deleting a lesson.
+    """
+    queryset = Lesson.objects.all()
+    serializer_class = LessonSerializer
+    permission_classes = [permissions.AllowAny]

@@ -1,21 +1,21 @@
 from rest_framework import serializers
 from .models import Course, Lesson
 from .validators import YouTubeURLValidator, NoExternalLinksValidator
-
+from .validators import validate_youtube_url  # Добавить импорт
+from .models import Course, Lesson, Subscription
 
 class LessonSerializer(serializers.ModelSerializer):
     """Serializer for Lesson model."""
+
+    video_url = serializers.URLField(validators=[validate_youtube_url])  # Добавить валидатор
 
     class Meta:
         model = Lesson
         fields = [
             'id', 'title', 'description', 'preview',
-            'video_url', 'course', 'owner', 'created_at', 'updated_at'
+            'video_url', 'course', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
-        validators = [
-            NoExternalLinksValidator(fields=['description']),
-        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
     def validate_video_url(self, value):
         """Validate video URL using YouTubeURLValidator."""
@@ -41,62 +41,60 @@ class LessonSerializer(serializers.ModelSerializer):
 class CourseSerializer(serializers.ModelSerializer):
     """Serializer for Course model."""
 
-    # Используем SerializerMethodField для количества уроков
-    lessons_count = serializers.SerializerMethodField()
+    lessons_count = serializers.IntegerField(
+        source='lessons.count',
+        read_only=True
+    )
     lessons = LessonSerializer(many=True, read_only=True)
+    is_subscribed = serializers.SerializerMethodField()  # Добавить поле
+
+    def get_is_subscribed(self, obj):
+        """Проверяет, подписан ли текущий пользователь на курс."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Subscription.objects.filter(
+                user=request.user,
+                course=obj
+            ).exists()
+        return False
 
     class Meta:
         model = Course
         fields = [
-            'id', 'title', 'preview', 'description', 'owner',
-            'created_at', 'updated_at', 'lessons_count', 'lessons'
+            'id', 'title', 'preview', 'description',
+            'created_at', 'updated_at', 'lessons_count',
+            'lessons', 'is_subscribed'  # Добавить is_subscribed
         ]
-        read_only_fields = ['id', 'owner', 'created_at', 'updated_at', 'lessons_count']
-        validators = [
-            NoExternalLinksValidator(fields=['description']),
-        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'lessons_count', 'is_subscribed']
 
-    def get_lessons_count(self, obj):
-        """Get count of lessons for the course."""
-        return obj.lessons.count()
-
-    def validate(self, data):
-        """Validate description for external links."""
-        if 'description' in data and data['description']:
-            from .validators import validate_no_external_links
-            validate_no_external_links(data['description'])
-
-        return data
 
 
 class CourseListSerializer(serializers.ModelSerializer):
     """Serializer for Course list (without detailed lessons)."""
 
-    # Используем SerializerMethodField для количества уроков
-    lessons_count = serializers.SerializerMethodField()
+    lessons_count = serializers.IntegerField(
+        source='lessons.count',
+        read_only=True
+    )
+    is_subscribed = serializers.SerializerMethodField()  # Добавить поле
+
+    def get_is_subscribed(self, obj):
+        """Проверяет, подписан ли текущий пользователь на курс."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Subscription.objects.filter(
+                user=request.user,
+                course=obj
+            ).exists()
+        return False
 
     class Meta:
         model = Course
         fields = [
-            'id', 'title', 'preview', 'description', 'owner',
-            'created_at', 'updated_at', 'lessons_count'
+            'id', 'title', 'preview', 'description',
+            'created_at', 'updated_at', 'lessons_count', 'is_subscribed'  # Добавить is_subscribed
         ]
-        read_only_fields = ['id', 'owner', 'created_at', 'updated_at', 'lessons_count']
-        validators = [
-            NoExternalLinksValidator(fields=['description']),
-        ]
-
-    def get_lessons_count(self, obj):
-        """Get count of lessons for the course."""
-        return obj.lessons.count()
-
-    def validate(self, data):
-        """Validate description for external links."""
-        if 'description' in data and data['description']:
-            from .validators import validate_no_external_links
-            validate_no_external_links(data['description'])
-
-        return data
+        read_only_fields = ['id', 'created_at', 'updated_at', 'lessons_count', 'is_subscribed']
 
 
 
@@ -108,11 +106,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Subscription
-        fields = [
-            'id', 'user', 'user_email', 'course', 'course_title',
-            'subscribed_at', 'is_active'
-        ]
-        read_only_fields = ['id', 'subscribed_at', 'is_active']
+        fields = ['id', 'user', 'course', 'created_at']
+        read_only_fields = ['id', 'created_at']
 
 
 class CourseWithSubscriptionSerializer(CourseSerializer):
