@@ -61,21 +61,31 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
-    """Serializer for Payment model."""
+    """Сериализатор платежа"""
 
     user_email = serializers.EmailField(source='user.email', read_only=True)
     course_title = serializers.CharField(source='course.title', read_only=True)
     lesson_title = serializers.CharField(source='lesson.title', read_only=True)
+
+    # Поля Stripe
+    stripe_payment_url = serializers.URLField(read_only=True)
+    stripe_payment_status = serializers.CharField(read_only=True)
+    is_paid = serializers.BooleanField(read_only=True)
+    is_stripe_payment = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Payment
         fields = [
             'id', 'user', 'user_email', 'payment_date',
             'course', 'course_title', 'lesson', 'lesson_title',
-            'amount', 'payment_method'
+            'amount', 'payment_method', 'is_paid', 'is_stripe_payment',
+            'stripe_product_id', 'stripe_price_id', 'stripe_session_id',
+            'stripe_payment_intent', 'stripe_payment_url', 'stripe_payment_status'
         ]
-        read_only_fields = ['id', 'payment_date', 'user_email',
-                            'course_title', 'lesson_title']
+        read_only_fields = [
+            'id', 'payment_date', 'user_email', 'course_title', 'lesson_title',
+            'stripe_payment_url', 'stripe_payment_status', 'is_paid', 'is_stripe_payment'
+        ]
 
 
 class PaymentDetailSerializer(serializers.ModelSerializer):
