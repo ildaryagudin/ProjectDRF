@@ -7,6 +7,8 @@ from .models import Course, Subscription
 from .serializers import SubscriptionSerializer
 from .paginators import CoursePagination, LessonPagination
 from .paginators import MaterialsPagination
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
+
 
 class SubscriptionAPIView(APIView):
     """
@@ -125,6 +127,53 @@ class CourseSubscriptionStatusAPIView(APIView):
         return Response({"is_subscribed": is_subscribed})
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary='Список курсов',
+        description='Получить список всех курсов (пользователи видят только свои курсы, модераторы - все)',
+        tags=['Курсы'],
+        parameters=[
+            OpenApiParameter(
+                name='page',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Номер страницы'
+            ),
+            OpenApiParameter(
+                name='page_size',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Количество элементов на странице'
+            ),
+        ]
+    ),
+    retrieve=extend_schema(
+        summary='Детали курса',
+        description='Получить детальную информацию о курсе, включая список уроков и статус подписки',
+        tags=['Курсы']
+    ),
+    create=extend_schema(
+        summary='Создать курс',
+        description='Создать новый курс (обычные пользователи могут создавать, модераторы - нет)',
+        tags=['Курсы'],
+        request=CourseSerializer,
+        responses={
+            201: CourseSerializer,
+            403: 'Недостаточно прав (модераторы не могут создавать курсы)'
+        }
+    ),
+    update=extend_schema(
+        summary='Обновить курс',
+        description='Обновить информацию о курсе (владелец или модератор)',
+        tags=['Курсы']
+    ),
+    destroy=extend_schema(
+        summary='Удалить курс',
+        description='Удалить курс (только владелец, модераторы не могут удалять)',
+        tags=['Курсы']
+    ),
+)
+
 class CourseViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Course model with CRUD operations.
@@ -138,8 +187,19 @@ class CourseViewSet(viewsets.ModelViewSet):
             return CourseListSerializer
         return CourseSerializer
 
-    @action(detail=True, methods=['post', 'delete'], url_path='subscribe')
-    def subscribe(self, request, pk=None):
+        @action(detail=True, methods=['post', 'delete'], url_path='subscribe')
+        @extend_schema(
+            summary='Подписчики курса',
+            description='Получить список подписчиков курса (владелец или модератор)',
+            tags=['Курсы', 'Подписки'],
+            responses={
+                200: SubscriptionSerializer(many=True),
+                403: 'Недостаточно прав'
+            }
+        )
+
+
+        def subscribe(self, request, pk=None):
         """Подписка/отписка на обновления курса."""
         course = self.get_object()
         user = request.user
@@ -182,6 +242,25 @@ class CourseViewSet(viewsets.ModelViewSet):
                 {'message': 'Вы не подписаны на этот курс'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+@extend_schema(
+    summary='Список уроков / Создать урок',
+    description='Получить список уроков или создать новый урок',
+    tags=['Уроки'],
+    parameters=[
+        OpenApiParameter(
+            name='page',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Номер страницы'
+        ),
+    ],
+    request=LessonSerializer,
+    responses={
+        200: LessonSerializer(many=True),
+        201: LessonSerializer
+    }
+)
 
 class LessonListCreateAPIView(generics.ListCreateAPIView):
     """
@@ -242,6 +321,24 @@ class SubscriptionAPIView(APIView):
         assert self.paginator is not None
         return self.paginator.get_paginated_response(data)
 
+@extend_schema(
+    summary='Проверить статус подписки',
+    description='Проверить, подписан ли текущий пользователь на указанный курс',
+    tags=['Подписки'],
+    responses={200: OpenApiTypes.OBJECT}
+)
+
+@extend_schema(
+    summary='Детали урока / Обновить / Удалить',
+    description='Получить, обновить или удалить урок',
+    tags=['Уроки'],
+    methods=['GET', 'PUT', 'PATCH', 'DELETE'],
+    responses={
+        200: LessonSerializer,
+        204: 'Урок успешно удален',
+        403: 'Недостаточно прав'
+    }
+)
 
 class LessonRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -250,3 +347,22 @@ class LessonRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Lesson.objects.all()
     serializer_class = LessonSerializer
     permission_classes = [permissions.AllowAny]
+
+@extend_schema(
+    summary='Управление подписками',
+    description='Подписаться на курс, отписаться или получить список подписок',
+    tags=['Подписки'],
+    methods=['GET', 'POST', 'DELETE'],
+    request=OpenApiTypes.OBJECT,
+    responses={
+        200: 'Операция выполнена успешно',
+        201: SubscriptionSerializer
+    },
+    examples=[
+        OpenApiExample(
+            'Запрос на подписку/отписку',
+            value={'course_id': 1},
+            description='POST: переключить статус подписки, DELETE: удалить подписку'
+        )
+    ]
+)

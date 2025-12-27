@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'drf_spectacular',
 
     # Third party apps
     'rest_framework',
@@ -139,6 +140,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 from datetime import timedelta
@@ -173,3 +175,52 @@ SIMPLE_JWT = {
 
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
+
+# Настройки drf-spectacular
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'LMS API Документация',
+    'DESCRIPTION': 'API для системы управления онлайн-обучением',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'displayOperationId': True,
+        'filter': True,
+        'persistAuthorization': True,
+        'displayRequestDuration': True,
+    },
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+
+    # Авторизация
+    'SECURITY': [
+        {
+            'Bearer': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            }
+        }
+    ],
+
+    # Группировка эндпоинтов
+    'TAGS': [
+        {'name': 'Пользователи', 'description': 'Регистрация, аутентификация и управление пользователями'},
+        {'name': 'Курсы', 'description': 'Управление курсами'},
+        {'name': 'Уроки', 'description': 'Управление уроками'},
+        {'name': 'Платежи', 'description': 'Оплата курсов и уроков'},
+        {'name': 'Подписки', 'description': 'Подписка на обновления курсов'},
+    ],
+
+    # Поддержка русского языка
+    'ENUM_NAME_OVERRIDES': {
+        'PaymentMethodEnum': 'users.models.Payment.PaymentMethod',
+    },
+}
+
+
+# Настройки Stripe
+STRIPE_SECRET_KEY = 'sk_test_ваш_тестовый_секретный_ключ'  # В продакшене используйте переменные окружения
+STRIPE_PUBLISHABLE_KEY = 'pk_test_ваш_тестовый_публичный_ключ'
+STRIPE_WEBHOOK_SECRET = 'whsec_ваш_вебхук_секрет'
+STRIPE_CURRENCY = 'usd'

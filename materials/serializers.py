@@ -3,6 +3,9 @@ from .models import Course, Lesson
 from .validators import YouTubeURLValidator, NoExternalLinksValidator
 from .validators import validate_youtube_url  # Добавить импорт
 from .models import Course, Lesson, Subscription
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from drf_spectacular.types import OpenApiTypes
+
 
 class LessonSerializer(serializers.ModelSerializer):
     """Serializer for Lesson model."""
@@ -13,9 +16,17 @@ class LessonSerializer(serializers.ModelSerializer):
         model = Lesson
         fields = [
             'id', 'title', 'description', 'preview',
-            'video_url', 'course', 'created_at', 'updated_at'
+            'video_url', 'course', 'owner', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'video_url': {
+                'help_text': 'Ссылка на видео YouTube (разрешены только ссылки на YouTube)'
+            },
+            'description': {
+                'help_text': 'Описание урока (не может содержать внешние ссылки кроме YouTube)'
+            }
+        }
 
     def validate_video_url(self, value):
         """Validate video URL using YouTubeURLValidator."""
@@ -110,6 +121,17 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
+@extend_schema_serializer(
+    examples=[
+        {
+            'title': 'Python для начинающих',
+            'description': 'Изучение Python с нуля',
+            'preview': 'http://example.com/course.jpg',
+            'owner': 1,
+            'is_subscribed': True
+        }
+    ]
+)
 class CourseWithSubscriptionSerializer(CourseSerializer):
     """Serializer for Course with subscription status."""
 
@@ -118,6 +140,7 @@ class CourseWithSubscriptionSerializer(CourseSerializer):
     class Meta(CourseSerializer.Meta):
         fields = CourseSerializer.Meta.fields + ['is_subscribed']
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_subscribed(self, obj):
         """Check if current user is subscribed to the course."""
         request = self.context.get('request')

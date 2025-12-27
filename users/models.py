@@ -65,27 +65,29 @@ class User(AbstractUser):
 
 
 class Payment(models.Model):
-    """Payment model for users."""
+    """Модель платежа"""
 
     class PaymentMethod(models.TextChoices):
-        CASH = 'cash', _('Cash')
-        TRANSFER = 'transfer', _('Bank Transfer')
+        CASH = 'cash', _('Наличные')
+        TRANSFER = 'transfer', _('Банковский перевод')
+        STRIPE = 'stripe', _('Оплата через Stripe')
 
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='payments',
-        verbose_name=_('user')
+        verbose_name=_('Пользователь')
     )
     payment_date = models.DateTimeField(
-        _('payment date'),
-        auto_now_add=True
+        _('Дата оплаты'),
+        null=True,
+        blank=True
     )
     course = models.ForeignKey(
         'materials.Course',
         on_delete=models.SET_NULL,
         related_name='payments',
-        verbose_name=_('paid course'),
+        verbose_name=_('Оплаченный курс'),
         blank=True,
         null=True
     )
@@ -93,30 +95,84 @@ class Payment(models.Model):
         'materials.Lesson',
         on_delete=models.SET_NULL,
         related_name='payments',
-        verbose_name=_('paid lesson'),
+        verbose_name=_('Оплаченный урок'),
         blank=True,
         null=True
     )
     amount = models.DecimalField(
-        _('amount'),
+        _('Сумма'),
         max_digits=10,
         decimal_places=2,
-        help_text=_('Payment amount')
+        help_text=_('Сумма оплаты')
     )
     payment_method = models.CharField(
-        _('payment method'),
+        _('Способ оплаты'),
         max_length=20,
         choices=PaymentMethod.choices,
         default=PaymentMethod.CASH
     )
 
+    # Поля для интеграции со Stripe
+    stripe_product_id = models.CharField(
+        _('ID продукта Stripe'),
+        max_length=100,
+        blank=True,
+        null=True
+    )
+    stripe_price_id = models.CharField(
+        _('ID цены Stripe'),
+        max_length=100,
+        blank=True,
+        null=True
+    )
+    stripe_session_id = models.CharField(
+        _('ID сессии Stripe'),
+        max_length=100,
+        blank=True,
+        null=True
+    )
+    stripe_payment_intent = models.CharField(
+        _('Payment Intent Stripe'),
+        max_length=100,
+        blank=True,
+        null=True
+    )
+    stripe_payment_url = models.URLField(
+        _('URL оплаты Stripe'),
+        max_length=500,
+        blank=True,
+        null=True
+    )
+    stripe_payment_status = models.CharField(
+        _('Статус оплаты Stripe'),
+        max_length=50,
+        blank=True,
+        null=True
+    )
+
     class Meta:
-        verbose_name = _('payment')
-        verbose_name_plural = _('payments')
+        verbose_name = _('Платеж')
+        verbose_name_plural = _('Платежи')
         ordering = ['-payment_date']
 
     def __str__(self):
-        return f"{self.user.email} - {self.amount} - {self.payment_date.strftime('%Y-%m-%d %H:%M')}"
+        return f"{self.user.email} - {self.amount} - {self.get_payment_method_display()}"
+
+    @property
+    def is_stripe_payment(self):
+        """Является ли платежом через Stripe"""
+        return self.payment_method == self.PaymentMethod.STRIPE
+
+    @property
+    def is_paid(self):
+        """Оплачен ли платеж"""
+        return self.payment_date is not None
+
+    def mark_as_paid(self, payment_date=None):
+        """Пометить как оплаченный"""
+        from django.utils import timezone
+        self.payment_date = payment_date or timezone.now()
+        self.save()
 
     def clean(self):
         """Validate that either course or lesson is set, but not both."""
