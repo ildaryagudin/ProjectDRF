@@ -8,6 +8,9 @@ from .serializers import SubscriptionSerializer
 from .paginators import CoursePagination, LessonPagination
 from .paginators import MaterialsPagination
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
+from django.utils import timezone
+from datetime import timedelta
+from tasks.tasks import send_course_update_notification
 
 
 class SubscriptionAPIView(APIView):
@@ -243,6 +246,28 @@ class CourseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+    def update(self, request, *args, **kwargs):
+        """Переопределяем update для отправки уведомлений"""
+        # Проверяем, когда курс обновлялся в последний раз
+        course = self.get_object()
+        last_update = course.updated_at
+
+        # Вызываем родительский метод
+        response = super().update(request, *args, **kwargs)
+
+        # Проверяем, прошло ли более 4 часов с последнего обновления
+        time_threshold = timezone.now() - timedelta(hours=4)
+
+        if last_update < time_threshold:
+            # Отправляем уведомления асинхронно
+            send_course_update_notification.delay(
+                course_id=course.id,
+                update_type='course'
+            )
+            logger.info(f"Запущена задача отправки уведомлений для курса {course.id}")
+
+        return response
+
 @extend_schema(
     summary='Список уроков / Создать урок',
     description='Получить список уроков или создать новый урок',
@@ -347,6 +372,33 @@ class LessonRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Lesson.objects.all()
     serializer_class = LessonSerializer
     permission_classes = [permissions.AllowAny]
+
+    def update(self, request, *args, **kwargs):
+        """Переопределяем update для отправки уведомлений при обновлении урока"""
+        # Получаем урок и его курс
+        lesson = self.get_object()
+        course = lesson.course
+        last_update = course.updated_at
+
+        # Вызываем родительский метод
+        response = super().update(request, *args, **kwargs)
+
+        # Проверяем, прошло ли более 4 часов с последнего обновления курса
+        time_threshold = timezone.now() - timedelta(hours=4)
+
+        if last_update < time_threshold:
+            # Обновляем время изменения курса
+            course.updated_at = timezone.now()
+            course.save(update_fields=['updated_at'])
+
+            # Отправляем уведомления асинхронно
+            send_course_update_notification.delay(
+                course_id=course.id,
+                update_type='lesson'
+            )
+            logger.info(f"Запущена задача отправки уведомлений для курса {course.id} (обновлен урок)")
+
+        return response
 
 @extend_schema(
     summary='Управление подписками',

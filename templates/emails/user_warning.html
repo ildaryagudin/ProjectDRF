@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; }
+        .warning { color: #d35400; font-weight: bold; }
+        .button { background: #3498db; color: white; padding: 10px 20px; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <h2>Важное уведомление</h2>
+    <p>Здравствуйте, {{ user_name }}!</p>
+
+    <p class="warning">
+        Ваш аккаунт будет автоматически заблокирован через {{ days_left }} дней
+        из-за длительного отсутствия активности.
+    </p>
+
+    <p>Последний вход: {{ last_login }}</p>
+
+    <p>Чтобы предотвратить блокировку, просто войдите в свой аккаунт:</p>
+    <p><a href="{{ login_url }}" class="button">Войти в аккаунт</a></p>
+
+    <p>Если у вас возникли проблемы, свяжитесь с поддержкой: {{ support_email }}</p>
+</body>
+</html>

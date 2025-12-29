@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обновление курса</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4a6fa5;
+            margin-bottom: 10px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a6fa5;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 12px;
+        }
+        .unsubscribe {
+            font-size: 11px;
+            color: #999;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Образовательная Платформа</div>
+            <h2>Обновление курса</h2>
+        </div>
+
+        <div class="content">
+            <p>Здравствуйте, {{ user_name }}!</p>
+
+            <p>Мы хотим сообщить вам, что в курсе <strong>"{{ course_title }}"</strong> произошли обновления {{ update_type }}.</p>
+
+            <p>{{ course_description }}</p>
+
+            <p style="text-align: center;">
+                <a href="{{ course_url }}" class="button">Перейти к курсу</a>
+            </p>
+
+            <p>Спасибо, что остаетесь с нами!</p>
+        </div>
+
+        <div class="footer">
+            <p>© {% now "Y" %} Образовательная Платформа. Все права защищены.</p>
+            <p>Это письмо отправлено автоматически, пожалуйста, не отвечайте на него.</p>
+
+            <div class="unsubscribe">
+                Если вы больше не хотите получать уведомления об этом курсе,
+                <a href="{{ unsubscribe_url }}">отпишитесь здесь</a>.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
