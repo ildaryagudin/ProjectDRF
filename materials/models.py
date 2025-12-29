@@ -87,6 +87,30 @@ class Course(models.Model):
             except ValidationError as e:
                 raise ValidationError({'description': e.message})
 
+    last_notification_sent = models.DateTimeField(
+        _('последнее уведомление отправлено'),
+        null=True,
+        blank=True,
+        help_text=_('Когда последний раз отправлялись уведомления об обновлении')
+    )
+
+    def should_send_notification(self):
+        """Проверяет, нужно ли отправлять уведомление об обновлении"""
+        if not self.last_notification_sent:
+            return True
+
+        # Проверяем, прошло ли более 4 часов с последнего уведомления
+        from django.utils import timezone
+        from datetime import timedelta
+
+        time_threshold = timezone.now() - timedelta(hours=4)
+        return self.last_notification_sent < time_threshold
+
+    def mark_notification_sent(self):
+        """Отмечает, что уведомление отправлено"""
+        from django.utils import timezone
+        self.last_notification_sent = timezone.now()
+        self.save(update_fields=['last_notification_sent'])
 
 class Lesson(models.Model):
     """Lesson model."""

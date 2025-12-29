@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; }
+        .alert { color: #c0392b; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2 class="alert">Ваш аккаунт заблокирован</h2>
+    <p>Здравствуйте, {{ user_name }}!</p>
+
+    <p>Ваш аккаунт был заблокирован из-за длительного отсутствия активности.</p>
+    <p>Последний вход: {{ last_login }}</p>
+
+    <p>Для восстановления доступа:</p>
+    <ol>
+        <li>Свяжитесь со службой поддержки: {{ support_email }}</li>
+        <li>Или отправьте запрос на разблокировку: <a href="{{ unblock_url }}">Запрос на разблокировку</a></li>
+    </ol>
+</body>
+</html>
