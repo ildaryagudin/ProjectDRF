@@ -1,0 +1,1 @@
+Couldn't parse '/Users/ildaryagudin/PycharmProjects/ProjectDRF/config/celery.py' as Python source: 'keyword argument repeated: beat_schedule' at line 88
