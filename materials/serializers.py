@@ -16,9 +16,9 @@ class LessonSerializer(serializers.ModelSerializer):
         model = Lesson
         fields = [
             'id', 'title', 'description', 'preview',
-            'video_url', 'course', 'owner', 'created_at', 'updated_at'
+            'video_url', 'course', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
         extra_kwargs = {
             'video_url': {
                 'help_text': 'Ссылка на видео YouTube (разрешены только ссылки на YouTube)'
