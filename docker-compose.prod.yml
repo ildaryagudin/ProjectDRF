@@ -1,0 +1,29 @@
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${PROD_SECRET_KEY}
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 2"
+
+  celery_worker:
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${PROD_SECRET_KEY}
+    deploy:
+      replicas: 2
+
+  celery_beat:
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${PROD_SECRET_KEY}
+
+  flower:
+    environment:
+      - DEBUG=False
+      - BASIC_AUTH=${FLOWER_AUTH}

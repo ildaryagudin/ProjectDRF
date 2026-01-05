@@ -1,0 +1,180 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: lms_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    networks:
+      - lms_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis для Celery и кэширования
+  redis:
+    image: redis:7-alpine
+    container_name: lms_redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT}:6379"
+    networks:
+      - lms_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Django приложение
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lms_backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+      - ./logs:/app/logs
+    environment:
+      - DEBUG=${DEBUG}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - EMAIL_BACKEND=${EMAIL_BACKEND}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+    ports:
+      - "${DJANGO_PORT}:8000"
+    networks:
+      - lms_network
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py createsuperuser --noinput || true &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+
+  # Celery worker
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lms_celery_worker
+    restart: always
+    depends_on:
+      - backend
+      - redis
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+      - ./logs:/app/logs
+    environment:
+      - DEBUG=${DEBUG}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    networks:
+      - lms_network
+    command: celery -A config worker --loglevel=info --queues=default,emails,maintenance --concurrency=4
+
+  # Celery beat для периодических задач
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lms_celery_beat
+    restart: always
+    depends_on:
+      - backend
+      - redis
+      - celery_worker
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+      - ./logs:/app/logs
+    environment:
+      - DEBUG=${DEBUG}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    networks:
+      - lms_network
+    command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+  # Flower для мониторинга Celery
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lms_flower
+    restart: always
+    depends_on:
+      - celery_worker
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    ports:
+      - "${FLOWER_PORT}:5555"
+    networks:
+      - lms_network
+    command: celery -A config flower --port=5555 --broker_api=http://redis:6379/
+
+  # Nginx для раздачи статики (опционально)
+  nginx:
+    image: nginx:alpine
+    container_name: lms_nginx
+    restart: always
+    depends_on:
+      - backend
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - static_volume:/app/static
+      - media_volume:/app/media
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - lms_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
+
+networks:
+  lms_network:
+    driver: bridge
